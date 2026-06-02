@@ -1,92 +1,112 @@
-# RUN_LOCAL.md – Hướng dẫn chạy Lab 04
+# Hướng dẫn vận hành Lab 04
+# (Đóng gói ứng dụng bằng Docker)
 
-Tài liệu này giúp người khác clone repo sạch và chạy lại service trong Docker.
+Đây là tài liệu hướng dẫn
+vận hành chi tiết nhất.
+Tài liệu này được soạn thảo
+dành riêng cho phân hệ
+Analytics Service (B5).
 
----
+## Thông tin dự án
 
-## 1. Clone repo
+Mã nguồn ứng dụng chạy thật
+nằm tại `src/analytics_app/`.
+Trong khi đó, thư mục
+`src/iot_app/` được giữ lại
+để làm mẫu đối chiếu.
+Cổng chạy mạng mặc định
+của container là 8000.
+
+## Hướng dẫn từng bước
+
+### Bước 1: Môi trường
+
+Hãy sao chép tệp cấu hình
+từ bản mẫu chuẩn bị sẵn:
 
 ```bash
-git clone <repo-url>
-cd FIT4110_lab04_docker_packaging
+cp .env.example .env
 ```
 
----
+### Bước 2: Cài thư viện
 
-## 2. Cài dependencies cho Newman/Prism/Spectral
+Tải và cài đặt tất cả
+các thư viện cần thiết:
 
 ```bash
 npm install
 ```
 
----
+### Bước 3: Build Image
 
-## 3. Build Docker image
+Chạy lệnh sau để tiến hành
+đóng gói thành Docker image:
 
 ```bash
-docker build -t fit4110/iot-ingestion:lab04 .
+docker build \
+  -t fit4110/analytics-service:lab04 \
+  .
 ```
 
----
+### Bước 4: Run Container
 
-## 4. Run container
+Bắt đầu khởi chạy container
+dựa trên image vừa tạo ra:
 
 ```bash
-docker run --rm \
-  --name fit4110-iot-lab04 \
+docker run -d \
+  --name fit4110-analytics-lab04 \
   -p 8000:8000 \
-  --env-file .env.example \
-  fit4110/iot-ingestion:lab04
+  --env-file .env \
+  fit4110/analytics-service:lab04
 ```
 
-Mở terminal khác, kiểm tra:
+### Bước 5: Healthcheck
+
+Gọi API để kiểm tra xem
+ứng dụng đã sẵn sàng chưa:
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-Kết quả mong đợi:
+## Phần kiểm thử Newman
 
-```json
-{
-  "status": "ok",
-  "service": "iot-ingestion",
-  "version": "0.4.0"
-}
-```
-
----
-
-## 5. Chạy Newman test trên container
+Tiến hành chạy bộ kiểm thử
+bằng phần mềm Newman ở local:
 
 ```bash
 npm run test:local
 ```
 
-Report sinh tại:
+Sau khi chạy hoàn tất,
+các báo cáo kết quả
+sẽ được tự động xuất ra
+bên trong thư mục `reports/`.
 
-```text
-reports/newman-lab04-local.xml
-reports/newman-lab04-local.html
-```
+## Phần Gắn tag lớp học và push
 
----
-
-## 6. Dừng container
-
-Nếu không dùng `--rm` hoặc container còn chạy:
+Thực hiện gắn tag lớp học
+và đẩy image lên registry:
 
 ```bash
-docker stop fit4110-iot-lab04
+docker tag \
+  fit4110/analytics-service:lab04 \
+  ghcr.io/connectivity-services-ad-pt/team-analytics:v0.1.0-team-analytics
+
+docker push \
+  ghcr.io/connectivity-services-ad-pt/team-analytics:v0.1.0-team-analytics
 ```
 
----
+## Phần dọn dẹp hệ thống
 
-## 7. Lệnh nhanh
+Cuối cùng, hãy dọn dẹp
+hệ thống bằng các lệnh sau:
 
 ```bash
-make build
-make run
-make test-docker
-make stop
+docker stop \
+  fit4110-analytics-lab04
+
+docker rm \
+  fit4110-analytics-lab04
 ```
