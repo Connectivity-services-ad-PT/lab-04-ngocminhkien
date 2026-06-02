@@ -1,0 +1,484 @@
+openapi: 3.1.0
+info:
+  title: B5 - Analytics Service API
+  version: 1.0.0
+  description: |
+    API cung cấp dịch vụ tổng hợp và phân tích dữ liệu cho hệ thống Smart Campus.
+    Đồng thời đóng vai trò Mock Endpoint tiếp nhận các luồng sự kiện bất đồng bộ (Queue async)
+    từ IoT Ingestion (Pair 06), Camera Stream, Access Gate và Core Business để chuẩn bị cho Lab 03.
+  contact:
+    name: Ngoc Minh Kien
+    email: kiennm.1771020401@dnu.edu.vn
+
+servers:
+  - url: http://localhost:4010
+    description: Mock Server chạy bằng Prism
+
+tags:
+  - name: System
+    description: Các API kiểm tra trạng thái vận hành hệ thống
+  - name: Ingestion
+    description: Các Endpoint Mock tiếp nhận luồng sự kiện từ các phân hệ khác (Mô phỏng Queue async)
+  - name: Analytics
+    description: Các API tính toán, truy vấn số liệu tổng hợp Dashboard
+  - name: Reports
+    description: Các API quản lý và kết xuất báo cáo phân tích sâu
+  - name: Anomalies
+    description: Các API truy vấn lịch sử sự cố bất thường
+
+paths:
+  /health:
+    get:
+      summary: Kiểm tra trạng thái hệ thống
+      description: Trả về trạng thái hoạt động hiện tại của hệ thống Analytics Service.
+      operationId: checkHealth
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service hoạt động bình thường
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /api/v1/analytics/ingest/iot:
+    post:
+      summary: Mock tiếp nhận sự kiện từ IoT Ingestion (Pair 06)
+      description: Endpoint mô phỏng để tiếp nhận dữ liệu telemetry và sự kiện vượt ngưỡng từ phân hệ B1 gửi sang.
+      operationId: ingestIotEvent
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorEvent'
+      responses:
+        '202':
+          description: Sự kiện IoT đã được tiếp nhận thành công vào hàng đợi mô phỏng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAccepted'
+
+  /api/v1/analytics/summary:
+    get:
+      summary: Lấy dữ liệu tổng hợp nhanh cho màn hình chính (Dashboard)
+      description: Truy vấn các chỉ số đo lường hiệu suất (KPIs) tổng quát trên toàn bộ Smart Campus để hiển thị thời gian thực trên Web Dashboard của nhóm B6.
+      operationId: getDashboardSummary
+      tags:
+        - Analytics
+      responses:
+        '200':
+          description: Trả về số liệu thống kê tổng hợp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+        '401':
+          description: Lỗi xác thực quyền truy cập do thiếu hoặc sai Token
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/v1/analytics/reports:
+    post:
+      summary: Yêu cầu trích xuất báo cáo phân tích sâu
+      description: Khởi tạo một tiến trình xử lý bất đồng bộ để kết xuất báo cáo dữ liệu lịch sử dựa theo cấu hình bộ lọc.
+      operationId: createAnalyticsReport
+      tags:
+        - Reports
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '201':
+          description: Tạo yêu cầu báo cáo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '400':
+          description: Tham số đầu vào không hợp lệ
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/v1/analytics/anomalies:
+    get:
+      summary: Lấy danh sách các sự kiện bất thường hệ thống phát hiện được
+      description: Trả về danh sách lịch sử các sự cố hoặc hành vi bất thường thu thập được, có hỗ trợ phân trang.
+      operationId: getAnomalyEvents
+      tags:
+        - Anomalies
+      parameters:
+        - name: page
+          in: query
+          required: true
+          description: Số trang hiện tại cần lấy dữ liệu
+          schema:
+            type: integer
+            minimum: 1
+        - name: limit
+          in: query
+          required: true
+          description: Số lượng bản ghi tối đa trên một trang dữ liệu
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Danh sách các sự kiện bất thường hoạt động mượt mà
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnomalyResponseArray'
+        '400':
+          description: Tham số phân trang truyền vào không hợp lệ
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  
+  /api/v1/analytics/ingest/access:
+    post:
+      summary: Mock tiếp nhận sự kiện từ Access Gate (B3)
+      description: Endpoint mô phỏng để tiếp nhận dữ liệu log quẹt thẻ và thay đổi trạng thái thẻ từ phân hệ B3 gửi sang phục vụ phân tích.
+      operationId: ingestAccessEvent
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampusEvent'
+      responses:
+        '202':
+          description: Sự kiện Access Gate đã được tiếp nhận thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAccepted'
+
+components:
+  schemas:
+    CampusEvent:
+      type: object
+      required:
+        - eventType
+        - eventId
+        - cardId
+        - timestamp
+      properties:
+        eventType:
+          type: string
+          enum: [GATE_SCAN, CARD_STATUS_CHANGE]
+          example: "GATE_SCAN"
+        eventId:
+          type: string
+          format: uuid
+          example: "0196fb3d-4ad7-7d1e-9f49-5d5148d2babc"
+        cardId:
+          type: string
+          example: "RFID-2026-001"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-05-26T08:00:00Z"
+      discriminator:
+        propertyName: eventType
+        mapping:
+          GATE_SCAN: '#/components/schemas/GateEvent'
+          CARD_STATUS_CHANGE: '#/components/schemas/CardEvent'
+      oneOf:
+        - $ref: '#/components/schemas/GateEvent'
+        - $ref: '#/components/schemas/CardEvent'
+
+    GateEvent:
+      allOf:
+        - $ref: '#/components/schemas/CampusEvent'
+        - type: object
+          properties:
+            gateId:
+              type: string
+              example: "GATE-01"
+            direction:
+              type: string
+              enum: [IN, OUT]
+              example: "IN"
+            decision:
+              type: string
+              enum: [ALLOW, DENY]
+              example: "ALLOW"
+
+    CardEvent:
+      allOf:
+        - $ref: '#/components/schemas/CampusEvent'
+        - type: object
+          properties:
+            previousStatus:
+              type: string
+              example: "ACTIVE"
+            newStatus:
+              type: string
+              example: "SUSPENDED"
+            reason:
+              type: [string, "null"]
+              example: "Lost card reported"
+
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-05-24T21:00:00Z"
+
+    EventAccepted:
+      type: object
+      required:
+        - eventId
+        - acceptedAt
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          example: "0196fb3d-4ad7-7d1e-9f49-5d5148d2b444"
+        acceptedAt:
+          type: string
+          format: date-time
+          example: "2026-05-24T21:05:00Z"
+
+    DashboardSummary:
+      type: object
+      required:
+        - total_records
+        - system_efficiency
+      properties:
+        total_records:
+          type: integer
+          example: 12540
+        system_efficiency:
+          type: number
+          example: 94.5
+        last_updated_by:
+          type: [string, "null"]
+          description: Tên người cập nhật cuối cùng, nhận null nếu hệ thống tự động xử lý
+          example: "b5_processor"
+
+    ReportRequest:
+      type: object
+      required:
+        - start_date
+        - end_date
+        - report_type
+      properties:
+        start_date:
+          type: string
+          format: date-time
+          example: "2026-05-24T00:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          example: "2026-05-24T23:59:59Z"
+        report_type:
+          type: string
+          enum: [iot, camera, access]
+          example: "iot"
+
+    ReportResponse:
+      type: object
+      required:
+        - report_id
+        - status
+      properties:
+        report_id:
+          type: string
+          format: uuid
+          example: "7b9e02a1-c35d-4e2b-a8f1-8c4d5e6f7a8b"
+        status:
+          type: string
+          example: "pending"
+
+    # --- KHỚP NỐI SCHEMA ĐA HÌNH VỚI NHÓM IOT THEO ĐÚNG ĐƠN ĐẶT HÀNG ---
+    SensorEvent:
+      type: object
+      required:
+        - eventType
+        - eventId
+        - correlationId
+        - deviceId
+        - timestamp
+      properties:
+        eventType:
+          type: string
+          enum: [sensor.reading.created, sensor.threshold.exceeded, device.status.changed]
+          example: "sensor.reading.created"
+        eventId:
+          type: string
+          format: uuid
+          example: "0196fb3d-4ad7-7d1e-9f49-5d5148d2b333"
+        correlationId:
+          type: string
+          format: uuid
+          example: "0196fb3d-4ad7-7d1e-9f49-5d5148d2babc"
+        deviceId:
+          type: string
+          example: "SENSOR-001"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-05-19T04:33:00Z"
+      discriminator:
+        propertyName: eventType
+        mapping:
+          sensor.reading.created: '#/components/schemas/SensorReadingCreatedEvent'
+          sensor.threshold.exceeded: '#/components/schemas/SensorThresholdExceededEvent'
+          device.status.changed: '#/components/schemas/DeviceStatusChangedEvent'
+      oneOf:
+        - $ref: '#/components/schemas/SensorReadingCreatedEvent'
+        - $ref: '#/components/schemas/SensorThresholdExceededEvent'
+        - $ref: '#/components/schemas/DeviceStatusChangedEvent'
+
+    SensorReadingCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/SensorEvent'
+        - type: object
+          properties:
+            sensorType:
+              type: string
+              example: "temperature"
+            value:
+              type: number
+              example: 30.5
+            unit:
+              type: string
+              example: "celsius"
+
+    SensorThresholdExceededEvent:
+      allOf:
+        - $ref: '#/components/schemas/SensorEvent'
+        - type: object
+          properties:
+            sensorType:
+              type: string
+              example: "smoke"
+            value:
+              type: number
+              example: 88.2
+            unit:
+              type: string
+              example: "ppm"
+            threshold:
+              type: number
+              example: 70
+            severity:
+              type: string
+              example: "HIGH"
+
+    DeviceStatusChangedEvent:
+      allOf:
+        - $ref: '#/components/schemas/SensorEvent'
+        - type: object
+          properties:
+            status:
+              type: string
+              example: "ONLINE"
+
+    AnomalyResponseArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/AnomalyEvent'
+
+    AnomalyEvent:
+      type: object
+      required:
+        - event_id
+        - type
+        - detected_at
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d"
+        type:
+          type: string
+          enum: [IoTAnomaly, VisionAnomaly]
+          example: "IoTAnomaly"
+        detected_at:
+          type: string
+          format: date-time
+          example: "2026-05-24T20:15:00Z"
+      discriminator:
+        propertyName: type
+        mapping:
+          IoTAnomaly: '#/components/schemas/IoTAnomaly'
+          VisionAnomaly: '#/components/schemas/VisionAnomaly'
+      oneOf:
+        - $ref: '#/components/schemas/IoTAnomaly'
+        - $ref: '#/components/schemas/VisionAnomaly'
+
+    IoTAnomaly:
+      allOf:
+        - $ref: '#/components/schemas/AnomalyEvent'
+        - type: object
+          properties:
+            sensor_id:
+              type: string
+              example: "SENSOR-102"
+            threshold_exceeded:
+              type: number
+              example: 45.2
+
+    VisionAnomaly:
+      allOf:
+        - $ref: '#/components/schemas/AnomalyEvent'
+        - type: object
+          properties:
+            camera_id:
+              type: string
+              example: "CAM-ZONE-A"
+            unauthorized_zone_id:
+              type: string
+              example: "ZONE-RESTRICTED"
+
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://api.smartcampus.edu.vn/errors/bad-request"
+        title:
+          type: string
+          example: "Invalid Input Parameters"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "The field 'start_date' cannot be greater than 'end_date'."
+        instance:
+          type: string
+          format: uri
+          example: "https://api.smartcampus.edu.vn/api/v1/analytics/reports"
