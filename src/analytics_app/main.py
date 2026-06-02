@@ -39,6 +39,7 @@ def verify_token(authorization: Optional[str]):
     return token
 
 @app.get("/health")
+@app.head("/health")
 def get_health():
     return {
         "status": "healthy",
